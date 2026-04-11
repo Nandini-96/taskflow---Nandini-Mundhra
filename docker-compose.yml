@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:15
+    container_name: taskflow_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  api:
+    build: ./backend
+    container_name: taskflow_api
+    depends_on:
+      - db
+    ports:
+      - "${PORT}:3000"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3000
+      DBMATE_MIGRATIONS_DIR: /app/db/migrations
+    volumes:
+      - ./db:/app/db
+    command: sh -c " echo 'Waiting for DB...' && sleep 5 && dbmate up && npm start "
+
+volumes:
+  pg_data:
