@@ -5,15 +5,24 @@ export const getProjects = async (req, res) => {
   try {
     const userId = req.user.user_id;
 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(
       `SELECT DISTINCT p.*
        FROM projects p
        LEFT JOIN tasks t ON t.project_id = p.id
-       WHERE p.owner_id = $1 OR t.assignee_id = $1`,
-      [userId]
+       WHERE p.owner_id = $1 OR t.assignee_id = $1
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset]
     );
 
-    res.json(result.rows);
+    res.json({
+      page,
+      limit,
+      data: result.rows,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -132,6 +141,48 @@ export const deleteProject = async (req, res) => {
     await pool.query("DELETE FROM projects WHERE id = $1", [id]);
 
     res.json({ message: "project deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+export const getProjectStats = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // check project exists
+    const projectRes = await pool.query(
+      "SELECT * FROM projects WHERE id = $1",
+      [id]
+    );
+
+    if (!projectRes.rows.length) {
+      return res.status(404).json({ error: "not found" });
+    }
+
+    // tasks by status
+    const statusStats = await pool.query(
+      `SELECT status, COUNT(*) as count
+       FROM tasks
+       WHERE project_id = $1
+       GROUP BY status`,
+      [id]
+    );
+
+    // tasks by assignee
+    const assigneeStats = await pool.query(
+      `SELECT assignee_id, COUNT(*) as count
+       FROM tasks
+       WHERE project_id = $1
+       GROUP BY assignee_id`,
+      [id]
+    );
+
+    res.json({
+      by_status: statusStats.rows,
+      by_assignee: assigneeStats.rows,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

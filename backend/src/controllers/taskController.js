@@ -2,14 +2,21 @@ import pool from "../db.js";
 
 // GET /projects/:id/tasks
 export const getTasks = async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // project_id
   const { status, assignee } = req.query;
 
   try {
+    // pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // base query
     let query = "SELECT * FROM tasks WHERE project_id = $1";
     let values = [id];
     let index = 2;
 
+    // filters
     if (status) {
       query += ` AND status = $${index++}`;
       values.push(status);
@@ -20,9 +27,18 @@ export const getTasks = async (req, res) => {
       values.push(assignee);
     }
 
+    // pagination
+    query += ` ORDER BY created_at DESC LIMIT $${index++} OFFSET $${index++}`;
+    values.push(limit, offset);
+
     const result = await pool.query(query, values);
 
-    res.json(result.rows);
+    res.json({
+      page,
+      limit,
+      count: result.rows.length,
+      data: result.rows,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
