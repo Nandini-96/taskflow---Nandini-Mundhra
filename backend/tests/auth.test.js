@@ -1,11 +1,11 @@
 import request from "supertest";
-import app from "../src/App.js";
+import app from "../src/app.js";
 
 describe("Auth API", () => {
   it("should register user", async () => {
     const res = await request(app).post("/auth/register").send({
       name: "Test",
-      email: "test@example.com",
+      email: "test${Date.now()}@example.com", // unique email id
       password: "123456",
     });
 
