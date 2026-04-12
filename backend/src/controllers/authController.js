@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../db.js";
-
+import logger from "../logger.js";
 const SALT_ROUNDS = 12;
 
 export const register = async (req, res) => {
@@ -41,7 +41,7 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   const { email, password } = req.body;
-  console.log("BODY:", req.body);
+  
   try {
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
@@ -52,16 +52,14 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const user = result.rows[0];
-
-    // compare password
+    const user = result.rows[0]; // ✅ THIS LINE FIXES EVERYTHING
+    
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // generate JWT
     const token = jwt.sign(
       {
         user_id: user.id,
@@ -70,9 +68,16 @@ export const login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
-
-    res.json({ access_token: token });
+    logger.info({
+    msg: "Login successful",
+    user_id: user.id,
+    email: user.email,
+  });
+    return res.status(200).json({
+      access_token: token,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("LOGIN ERROR:", err); // helpful debug
+    return res.status(500).json({ error: err.message });
   }
 };
